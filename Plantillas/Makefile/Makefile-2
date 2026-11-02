@@ -1,0 +1,1013 @@
+############################################################################
+##									  ##
+##				RAINE					  ##
+##									  ##
+############################################################################
+
+##
+## type make RAINECPS=1 to build rainecps
+## The default is to build a dynamic version. Use make STATIC=1 to build a
+## static version.
+##
+## Requirements: read the docs !
+##
+## Changes:
+## The log is too long now. Please use cvs -l to see it.
+
+# version (when the version increases, raine shows the issue dialog on
+# startup
+VERSION = "0.38.1"
+
+# Comment out if you don't want the debug features
+# RAINE_DEBUG = 1
+
+# Be verbose ?
+# VERBOSE = 1
+
+# Use asm video core ? (comment to use C core)
+ASM_VIDEO_CORE = 1
+
+# Try to detect mingw... If you want to build the dos and the mingw
+# version on the same system you should unset djdir before making
+# the mingw version.
+ifeq ("$(OSTYPE)","msys")
+MINGDIR=1
+OSTYPE=mingw32
+ifeq (`nasm -r`,)
+ASM=@nasmw
+else
+ASM=@nasm
+endif
+endif
+
+ifdef mingdir
+MINGDIR=1
+endif
+
+ifdef MINGDIR
+# mingw
+RAINE32 = 1
+OSTYPE = mingw32
+endif
+
+RM =	@rm -f
+ifeq ($(CC),)
+CC=gcc
+endif
+# This test is for stupid win32 gcc ports with bad defaults
+ifeq ($(CC),cc)
+CC=gcc
+endif
+CC2= $(CC)
+ifdef VERBOSE
+CCV=$(CC)
+else
+CCV=@$(CC)
+endif
+
+MD =	@mkdir
+
+# error logging (djgpp - old stuff)
+# CC =	redir -ea errorlog.txt gcc
+
+# profiling
+# CC =	gcc -pg
+
+INCDIR= -I. \
+	-Isource \
+	-Isource/68000 \
+	-Isource/68020 \
+	-Isource/z80 \
+	-Isource/6502 \
+	-Isource/m68705 \
+	-Isource/sound \
+	-Isource/games \
+	-Isource/video \
+	-Isource/gui \
+	-Isource/mame
+ifdef RAINE_DEBUG
+INCDIR +=	-Isource/debug
+endif
+
+ifeq ($(OSTYPE),cygwin)
+
+   # Cygwin
+
+RAINE_EXE = raine32.exe
+RAINECPS_EXE = rainecps32.exe
+
+AFLAGS = -f coff
+
+RAINE32 = 1
+
+DEFINE = -D__RAINE__ \
+	   -DRAINE_WIN32 \
+
+   LIBS = -lz -lalleg
+   LIBS_STATIC = -lz -lalleg_s -lkernel32 -luser32 -lgdi32 -lcomdlg32 \
+   -lole32 -ldinput -lddraw -ldxguid -lwinmm -ldsound \
+   -L/lib/mingw -lmoldname -lmsvcrt
+
+LIBS_DEBUG = -lz -lalld
+
+  LFLAGS = -mno-cygwin -mwindows
+
+else
+ifdef RAINE32
+
+   # MINGW32
+
+   RAINE_EXE = raine32.exe
+   RAINECPS_EXE = rainecps32.exe
+ifdef CROSSCOMPILE
+	ASM = @nasm
+	MD = @mkdir
+else
+ifndef ASM
+   ASM = @nasmw.exe # auto-detection broken for mingw !!!
+endif
+   MD = @mkdir.exe # to avoid the built-in command... strange it's necessary...
+endif
+
+   AFLAGS = -f coff
+
+   DEFINE = -D__RAINE__ \
+	   -DRAINE_WIN32 \
+
+   LIBS = -lz -lalleg
+   LIBS_STATIC = -lz -lalleg_s -lkernel32 -luser32 -lgdi32 -lcomdlg32 \
+   -lole32 -ldinput -lddraw -ldxguid -lwinmm -ldsound
+
+LIBS_DEBUG = -lz -lalld
+
+   LFLAGS = -mwindows
+else
+ifdef DJDIR
+   RAINE_EXE = Raine.exe
+   RAINECPS_EXE = rainecps.exe
+ifdef CROSSCOMPILE
+	ASM = @nasm
+else
+	ASM = @nasmw.exe # auto-detection broken for djgpp !!!
+endif
+
+   OSTYPE = dos
+   AFLAGS = -f coff
+
+   DEFINE = -D__RAINE__ \
+	   -DRAINE_DOS
+
+   LIBS = -lz -lalleg
+else
+# linux
+
+#	SDL = 1
+
+   bindir = $(prefix)/usr/games
+   sharedir = $(prefix)/usr/share
+   mandir = $(sharedir)/man/man6
+   rainedata = $(sharedir)/games/raine
+   langdir = $(rainedata)/languages
+   romdir = $(rainedata)/roms
+
+   RAINE_EXE = raine
+   RAINE_DAT = raine.dat
+   RAINE_LNG = Brasil.cfg Dansk.cfg Español.cfg French2.cfg German2.cfg Japanese.cfg Spanish.cfg Turkish.cfg Catala.cfg Dutch.cfg Euskera.cfg French.cfg German.cfg POLISH.CFG Svenska.cfg CZECH.CFG English.cfg Finnish.cfg galego.cfg Italian.cfg Portugal.cfg Template.cfg
+   RAINECPS_EXE = rainecps
+   RAINE_LINUX = 1
+
+   INSTALL = /usr/bin/install
+   INSTALL_BIN = $(INSTALL) -m 755
+   INSTALL_DATA = $(INSTALL) -m 644
+   RD = rmdir --ignore-fail-on-non-empty
+   CD = cd
+
+   AFLAGS = -f elf
+
+   INCDIR += ` allegro-config --cflags`
+
+   DEFINE = -D__RAINE__ \
+	   -DRAINE_UNIX \
+
+   LIBS = -lz `allegro-config --libs` -lvga # -lefence
+   LIBS_DEBUG = -lz -lvga `allegro-config --libs debug`
+
+   LIBS_STATIC = -lz -lvga `allegro-config --static`
+
+endif # linux / mingw32
+endif # djgpp
+endif # if OSTYPE == cygwin
+
+ifdef SDL
+LIBS += `sdl-config --libs`
+LIBS_STATIC += `sdl-config --static-libs`
+endif
+
+ifndef ASM
+# Assembler detection...
+ifeq (`nasm -r`,)
+ASM=@nasmw
+else
+ASM=@nasm
+endif
+endif
+
+# Uncomment if you want to use the SEAL audio library (linux, dos or win32)
+# for linux, the default is to use allegro which is much better in linux,
+# Now allegro is the default for all the targets since we don't have any
+# more noises or clicks (0.37.3). And moreover seal is dead since the end of
+# 1998.
+ifdef RAINE_LINUX
+# SEAL = 1
+else
+ifdef RAINE32
+# SEAL = 1
+else
+ifdef RAINE_DOS
+# In dos seal is better to handle pci soundcards.
+# SEAL = 1
+endif
+endif
+endif
+
+ifdef SEAL
+LIBS += -laudio
+LIBS_STATIC += -laudio
+ifdef RAINE32
+LIBS += -lmsvcrt \
+	-lkernel32 -lwinmm \
+	-lole32 -luser32 \
+ -ldsound
+endif
+endif
+
+# To allow corss-compilation, we need one dir / target
+OBJDIR = $(OSTYPE)
+
+ifeq "$(RAINE32) $(STATIC)" "1 1"
+# Windows need a separate object dir for the static version (for allegro)
+OBJDIR := $(OBJDIR)/static
+else
+OBJDIR := $(OBJDIR)/object
+endif
+ifdef RAINECPS
+OBJDIR := $(OBJDIR)/rainecps
+RAINE_EXE := $(RAINECPS_EXE)
+endif
+ifdef SDL
+OBJDIR := $(OBJDIR)/sdl
+endif
+
+ifdef RAINE_DEBUG
+OBJDIR := $(OBJDIR)d
+endif
+
+ifdef ASM_VIDEO_CORE
+VIDEO_CORE = $(OBJDIR)/video/i386
+else
+VIDEO_CORE = $(OBJDIR)/video/c
+endif
+
+OBJDIRS=$(OBJDIR) \
+	$(OBJDIR)/mame \
+	$(OBJDIR)/sound \
+	$(OBJDIR)/68000 \
+	$(OBJDIR)/68020 \
+	$(OBJDIR)/z80 \
+	$(OBJDIR)/6502 \
+	$(OBJDIR)/m68705 \
+	$(OBJDIR)/video \
+	$(OBJDIR)/video/c \
+	$(OBJDIR)/video/c/lscroll \
+	$(VIDEO_CORE) \
+	$(VIDEO_CORE)/newspr2 \
+	$(OBJDIR)/video/i386/packed \
+	$(VIDEO_CORE)/str \
+	$(VIDEO_CORE)/blit_x2 \
+	$(OBJDIR)/video/zoom \
+	$(OBJDIR)/games
+
+ifdef SEAL
+OBJDIRS += $(OBJDIR)/seal
+endif
+
+ifdef RAINE_DEBUG
+OBJDIRS += $(OBJDIR)/debug \
+	$(OBJDIR)/debug/dz80
+endif
+
+ifeq ($(OSTYPE),cygwin)
+INCDIR += -I/usr/local/include
+endif
+
+ifdef RAINE_DEBUG
+CFLAGS = $(INCDIR) $(DEFINE) $(_MARCH) -Wall -g -DRAINE_DEBUG
+CFLAGS_MCU = $(CFLAGS)
+
+else
+# All the flags are optimisations except -fomit-frame-pointer necessary for
+# the 68020 core in dos. -Wno-trigraphs suppress some anoying warnings with
+# gcc-2.96
+# These flags are for gcc-2.x
+
+CFLAGS = $(INCDIR) \
+	$(DEFINE) \
+	$(_MARCH) \
+	-Wno-trigraphs \
+	-O4 \
+	-fschedule-insns2 \
+	-funroll-all-loops \
+	-fexpensive-optimizations \
+	-ffast-math \
+	-w \
+	-fomit-frame-pointer
+
+# This is required for gcc-2.9x (bug in -fomit-frame-pointer)
+CFLAGS_MCU = $(_MARCH) -O3 -fexpensive-optimizations # switches for the 68705 mcus
+
+ifdef RAINE_LINUX
+CFLAGS += -pipe
+endif
+# The accumulate-outgoing-args is for gcc3, but I am not sure it has any
+# effect... And I could not notice any improvement with my duron if I change
+# the cpu and arch to athlon... For now I comment the gcc3 option for the
+# win32 version (no gcc3 for win32 for now).
+#	 -maccumulate-outgoing-args
+#	-pedantic
+endif
+
+ifdef RAINECPS
+CFLAGS += -DNO020 -DRAINECPS
+endif
+ifdef SDL
+CFLAGS += -DSDL `sdl-config --cflags`
+CFLAGS_MCU += -DSDL `sdl-config --cflags`
+OBJDIRS +=	$(OBJDIR)/sdl $(OBJDIR)/alleg $(OBJDIR)/gui
+else
+OBJDIRS += $(OBJDIR)/alleg \
+	$(OBJDIR)/gui
+endif
+
+# assembler (gas)
+SFLAGS= $(INCDIR) \
+	$(DEFINE) \
+	-Wall \
+	$(_MARCH) \
+	-xassembler-with-cpp \
+
+ifeq ($(OSTYPE),cygwin)
+CFLAGS += -mno-cygwin
+CFLAGS_MCU += -mno-cygwin
+SFLAGS += -mno-cygwin
+endif
+
+ifdef RAINE_DEBUG
+
+# Debuger
+
+# dz80 interface
+
+DZ80=	$(OBJDIR)/debug/dz80/dissz80.o \
+	$(OBJDIR)/debug/dz80/dz80_raine.o \
+	$(OBJDIR)/debug/dz80/tables.o
+
+DEBUG= $(OBJDIR)/debug/dbg_gui.o \
+	$(OBJDIR)/debug/breakpt.o \
+	$(DZ80)
+
+endif
+
+# ASM 68020 core
+
+ASM020= $(OBJDIR)/68020/newcpu.o \
+	$(OBJDIR)/68020/readcpu.o \
+	$(OBJDIR)/68020/cpustbl.o \
+	$(OBJDIR)/68020/cpudefs.o \
+	$(OBJDIR)/68020/a020core.o \
+
+# STARSCREAM 68000 core
+
+SC000=	$(OBJDIR)/68000/s68000.oa \
+	$(OBJDIR)/68000/starhelp.o \
+
+# MZ80 core
+
+MZ80=	$(OBJDIR)/z80/mz80.oa \
+	$(OBJDIR)/z80/mz80help.o
+
+# network core
+
+NET=	$(OBJDIR)/net/d_system.o \
+	$(OBJDIR)/net/d_net.o \
+	$(OBJDIR)/net/d_netfil.o
+
+# M6502 core
+
+M6502=	$(OBJDIR)/6502/m6502.oa \
+	$(OBJDIR)/6502/m6502hlp.o \
+
+# M68705 core
+
+M68705= $(OBJDIR)/m68705/m68705.o \
+
+# virtua i960 core
+
+I960=	$(OBJDIR)/i960/i960cpu.o \
+
+# Video core
+
+VIDEO=	$(OBJDIR)/video/tilemod.o \
+	$(OBJDIR)/video/palette.o \
+	$(OBJDIR)/video/priorities.o \
+	$(OBJDIR)/video/blitasm.o \
+	$(OBJDIR)/video/newspr.o \
+	$(OBJDIR)/video/spr64.o \
+	$(OBJDIR)/video/cache.o \
+	$(OBJDIR)/video/stretch.o \
+	$(OBJDIR)/video/i386/move.o \
+	$(OBJDIR)/video/i386/newspr2/8.o \
+	$(OBJDIR)/video/i386/newspr2/16.o \
+	$(OBJDIR)/video/i386/newspr2/32.o \
+	$(OBJDIR)/video/i386/packed/8.o \
+	$(OBJDIR)/video/i386/packed/16.o \
+	$(OBJDIR)/video/i386/packed/32.o \
+	$(VIDEO_CORE)/spr16x8.o \
+	$(VIDEO_CORE)/spr8x8_8.o \
+	$(VIDEO_CORE)/spr8_16.o \
+	$(VIDEO_CORE)/spr8_32.o \
+	$(VIDEO_CORE)/str/6x8_8.o \
+	$(VIDEO_CORE)/str/6x8_16.o \
+	$(VIDEO_CORE)/str/6x8_32.o \
+		\
+	$(VIDEO_CORE)/16x16_8.o \
+	$(VIDEO_CORE)/16x16_16.o \
+	$(VIDEO_CORE)/16x16_32.o \
+		\
+	$(OBJDIR)/video/i386/32x32_8.o \
+	$(OBJDIR)/video/i386/32x32_16.o \
+	$(OBJDIR)/video/i386/32x32_32.o \
+		\
+	$(VIDEO_CORE)/blit_x2/8.o \
+	$(VIDEO_CORE)/blit_x2/16.o \
+	$(VIDEO_CORE)/blit_x2/24.o \
+	$(VIDEO_CORE)/blit_x2/32.o \
+	$(OBJDIR)/video/zoom/16x16.o \
+	$(OBJDIR)/video/zoom/16x16_16.o \
+	$(OBJDIR)/video/zoom/16x16_32.o \
+	$(OBJDIR)/video/zoom/16x8.o \
+	$(OBJDIR)/video/arcmon.o \
+	$(OBJDIR)/video/arcmode.o \
+	$(OBJDIR)/video/eagle.oa \
+	$(OBJDIR)/video/c/lscroll/16_8.o \
+	$(OBJDIR)/video/c/lscroll/16_16.o \
+	$(OBJDIR)/video/c/lscroll/16_32.o \
+
+# Sound core
+
+CPS1_SOUND= \
+	$(OBJDIR)/sound/2151intf.o \
+	$(OBJDIR)/sound/adpcm.o \
+	$(OBJDIR)/sound/fm.o \
+	$(OBJDIR)/sound/ym2151.o \
+	$(OBJDIR)/sound/smp16bit.o \
+	$(OBJDIR)/sound/qsound.o \
+	$(OBJDIR)/sound/emulator.o
+
+SOUND=	$(OBJDIR)/sound/2610intf.o \
+	$(OBJDIR)/sound/ymdeltat.o \
+	$(OBJDIR)/sound/2203intf.o \
+	$(OBJDIR)/sound/3812intf.o \
+	$(OBJDIR)/sound/ay8910.o \
+	$(OBJDIR)/sound/fmopl.o \
+	$(OBJDIR)/sound/ymz280b.o \
+	$(OBJDIR)/sound/m6585.o \
+	$(OBJDIR)/sound/msm5205.o \
+	$(OBJDIR)/sound/es5506.o \
+	$(OBJDIR)/sound/ymf278b.o \
+	$(OBJDIR)/sound/namco.o \
+	$(CPS1_SOUND)
+
+# Release Games
+
+CPS1_GAMES= 	$(OBJDIR)/games/cps1.o $(OBJDIR)/games/cps1drv.o
+
+MCU_OBJ = $(OBJDIR)/games/bubl_mcu.o $(OBJDIR)/games/kiki_mcu.o $(OBJDIR)/games/kick_mcu.o
+
+GAMES=	$(OBJDIR)/games/arabianm.o \
+	$(OBJDIR)/games/arkanoid.o \
+	$(OBJDIR)/games/arkretrn.o \
+	$(OBJDIR)/games/armedf.o \
+	$(OBJDIR)/games/ashura.o \
+	$(OBJDIR)/games/asuka.o \
+	$(OBJDIR)/games/biomtoy.o \
+	$(OBJDIR)/games/bloodbro.o \
+	$(OBJDIR)/games/bonzeadv.o \
+	$(OBJDIR)/games/bshark.o \
+	$(OBJDIR)/games/bubblem.o \
+	$(OBJDIR)/games/bublbobl.o \
+	$(OBJDIR)/games/bubsymph.o \
+	$(OBJDIR)/games/cabal.o \
+	$(OBJDIR)/games/cadash.o \
+	$(OBJDIR)/games/chasehq.o \
+	$(OBJDIR)/games/ctribebl.o \
+	$(OBJDIR)/games/cameltry.o \
+	$(OBJDIR)/games/cleofort.o \
+	$(OBJDIR)/games/crimec.o \
+	$(OBJDIR)/games/darius.o \
+	$(OBJDIR)/games/darius2d.o \
+	$(OBJDIR)/games/dariusg.o \
+	$(OBJDIR)/games/dinorex.o \
+	$(OBJDIR)/games/dondokod.o \
+	$(OBJDIR)/games/doubled3.o \
+	$(OBJDIR)/games/driftout.o \
+	$(OBJDIR)/games/eaction2.o \
+	$(OBJDIR)/games/earthjkr.o \
+	$(OBJDIR)/games/fchamp.o \
+	$(OBJDIR)/games/exzisus.o \
+	$(OBJDIR)/games/finalb.o \
+	$(OBJDIR)/games/galpanic.o \
+	$(OBJDIR)/games/gcpball.o \
+	$(OBJDIR)/games/gekridan.o \
+	$(OBJDIR)/games/growl.o \
+	$(OBJDIR)/games/gunbird.o \
+	$(OBJDIR)/games/hitice.o \
+	$(OBJDIR)/games/hyperpcb.o \
+	$(OBJDIR)/games/kaiserkn.o \
+	$(OBJDIR)/games/liquidk.o \
+	$(OBJDIR)/games/macrossp.o \
+	$(OBJDIR)/games/masterw.o \
+	$(OBJDIR)/games/mcatadv.o \
+	$(OBJDIR)/games/megab.o \
+	$(OBJDIR)/games/ninjak.o \
+	$(OBJDIR)/games/ninjaw.o \
+	$(OBJDIR)/games/othunder.o \
+	$(OBJDIR)/games/opwolf.o \
+	$(OBJDIR)/games/pbobble2.o \
+	$(OBJDIR)/games/pbobble3.o \
+	$(OBJDIR)/games/pengo.o \
+	$(OBJDIR)/games/popnpop.o \
+	$(OBJDIR)/games/puchicar.o \
+	$(OBJDIR)/games/pulirula.o \
+	$(OBJDIR)/games/rainbow.o \
+	$(OBJDIR)/games/rambo3.o \
+	$(OBJDIR)/games/rastan.o \
+	$(OBJDIR)/games/rastan2.o \
+	$(OBJDIR)/games/robokid.o \
+	$(OBJDIR)/games/silentd.o \
+	$(OBJDIR)/games/silkworm.o \
+	$(OBJDIR)/games/solfigtr.o \
+	$(OBJDIR)/games/spacegun.o \
+	$(OBJDIR)/games/spcinv95.o \
+	$(OBJDIR)/games/ssi.o \
+	$(OBJDIR)/games/syvalion.o \
+	$(OBJDIR)/games/terrac.o \
+	$(OBJDIR)/games/terraf.o \
+	$(OBJDIR)/games/tetrist.o \
+	$(OBJDIR)/games/thundfox.o \
+	$(OBJDIR)/games/toki.o \
+	$(OBJDIR)/games/twinqix.o \
+	$(OBJDIR)/games/viofight.o \
+	$(OBJDIR)/games/warriorb.o \
+	$(OBJDIR)/games/wrestlef.o \
+	$(OBJDIR)/games/wwfsstar.o \
+	$(OBJDIR)/games/zerozone.o \
+	$(OBJDIR)/games/ksystem.o \
+	$(OBJDIR)/games/gunfront.o \
+	$(OBJDIR)/games/gunlock.o \
+	$(OBJDIR)/games/gridseek.o \
+	$(MCU_OBJ) \
+	$(CPS1_GAMES)
+
+# System drivers
+
+CPS1_SYS=	$(OBJDIR)/games/games.o \
+	$(OBJDIR)/games/default.o \
+
+SYSDRV= \
+	$(OBJDIR)/games/f3system.o \
+	$(OBJDIR)/games/konamigx.o \
+	$(OBJDIR)/games/lsystem.o \
+	$(OBJDIR)/games/megasys1.o \
+	$(OBJDIR)/games/nichisnd.o \
+	$(OBJDIR)/games/quizgame.o \
+	$(OBJDIR)/games/nmk.o \
+	$(OBJDIR)/games/taitosnd.o \
+	$(OBJDIR)/games/tchnosnd.o \
+	$(OBJDIR)/games/tecmosys.o \
+	$(OBJDIR)/games/bsystem.o \
+	$(OBJDIR)/games/xsystem1.o \
+	$(OBJDIR)/games/xsystem2.o \
+	$(OBJDIR)/games/toaplan1.o \
+	$(OBJDIR)/games/toaplan2.o \
+	$(OBJDIR)/games/upl.o \
+	$(OBJDIR)/games/setax1.o \
+	$(OBJDIR)/games/tc002obj.o \
+	$(OBJDIR)/games/tc003vcu.o \
+	$(OBJDIR)/games/tc004vcu.o \
+	$(OBJDIR)/games/tc005rot.o \
+	$(OBJDIR)/games/tc006vcu.o \
+	$(OBJDIR)/games/tc100scn.o \
+	$(OBJDIR)/games/tc101scn.o \
+	$(OBJDIR)/games/tc110pcr.o \
+	$(OBJDIR)/games/tc140syt.o \
+	$(OBJDIR)/games/tc150rod.o \
+	$(OBJDIR)/games/tc180vcu.o \
+	$(OBJDIR)/games/tc200obj.o \
+	$(OBJDIR)/games/tc220ioc.o \
+	$(CPS1_SYS)
+
+# Beta only games
+
+BGAMES= $(OBJDIR)/games/chasehq2.o \
+	$(OBJDIR)/games/koshien.o \
+	$(OBJDIR)/games/lightbr.o \
+	$(OBJDIR)/games/cupfinal.o \
+	$(OBJDIR)/games/intcup94.o \
+	$(OBJDIR)/games/opwolf3.o \
+	$(OBJDIR)/games/trstars.o \
+	$(OBJDIR)/games/topland.o \
+	$(OBJDIR)/games/topspeed.o \
+	$(OBJDIR)/games/metalb.o \
+	$(OBJDIR)/games/ainferno.o \
+	$(OBJDIR)/games/aquajack.o \
+	$(OBJDIR)/games/chaknpop.o \
+	$(OBJDIR)/games/contcirc.o \
+	$(OBJDIR)/games/dleague.o \
+	$(OBJDIR)/games/recordbr.o \
+	$(OBJDIR)/games/ringrage.o \
+	$(OBJDIR)/games/undrfire.o \
+	$(OBJDIR)/games/ridefght.o \
+	$(OBJDIR)/games/deadconx.o \
+	$(OBJDIR)/games/pbobble4.o \
+	$(OBJDIR)/games/volfied.o \
+	$(OBJDIR)/games/megasy32.o \
+	$(OBJDIR)/games/ktiger2.o \
+	$(OBJDIR)/games/f3demo.o \
+	$(OBJDIR)/games/flstory.o \
+	$(OBJDIR)/games/wgp.o \
+	$(OBJDIR)/games/superchs.o \
+	$(OBJDIR)/games/hthero95.o \
+	$(OBJDIR)/games/heavyunt.o \
+	$(OBJDIR)/games/landmakr.o \
+	$(OBJDIR)/games/dangarb.o \
+	$(OBJDIR)/games/mjnquest.o \
+	$(OBJDIR)/games/cave.o \
+	$(OBJDIR)/games/psyforce.o \
+#	$(OBJDIR)/games/seta.o \
+
+# Interface
+
+GUI=	$(OBJDIR)/gui/gui.o \
+	$(OBJDIR)/gui/rgui.o \
+	$(OBJDIR)/gui/rguiproc.o \
+	$(OBJDIR)/gui/rfsel.o \
+	$(OBJDIR)/gui/about.o \
+	$(OBJDIR)/gui/cheat.o \
+	$(OBJDIR)/gui/dlg_dsw.o \
+	$(OBJDIR)/gui/sound.o \
+	$(OBJDIR)/gui/keys.o \
+	$(OBJDIR)/gui/joystick.o \
+
+SDLO=	$(OBJDIR)/sdl/compat.o \
+	$(OBJDIR)/sdl/display.o
+
+# Core
+
+CORE=	$(OBJDIR)/raine.o \
+	$(OBJDIR)/hiscore.o \
+	$(OBJDIR)/history.o \
+	$(OBJDIR)/ingame.o \
+	$(OBJDIR)/savegame.o \
+	$(OBJDIR)/arpro.o \
+	$(OBJDIR)/decode.o \
+	$(OBJDIR)/control.o \
+	$(OBJDIR)/debug.o \
+	$(OBJDIR)/config.o \
+	$(OBJDIR)/confile.o \
+	$(OBJDIR)/unzip.o \
+	$(OBJDIR)/files.o \
+	$(OBJDIR)/newmem.o \
+	$(OBJDIR)/dsw.o \
+	$(OBJDIR)/cpuid.o \
+	$(OBJDIR)/cpumain.o \
+	$(OBJDIR)/emumain.o \
+	$(OBJDIR)/cat93c46.o \
+	$(OBJDIR)/loadroms.o \
+	$(OBJDIR)/demos.o \
+	$(OBJDIR)/timer.o
+
+# Mame Support (eeprom and handlers for the sound interface)
+
+MAME=	$(OBJDIR)/mame/memory.o \
+	$(OBJDIR)/mame/eeprom.o \
+
+ifdef RAINECPS
+OBJS=	$(SC000) \
+	$(MZ80) \
+	$(CPS1_GAMES) \
+	$(CPS1_SYS) \
+	$(VIDEO) \
+	$(CPS1_SOUND) \
+	$(CORE) \
+	$(MAME) \
+	$(DEBUG) \
+	$(GUI) \
+	$(OBJDIR)/alleg/profile.o \
+	$(OBJDIR)/alleg/soundcfg.o
+else
+OBJS=	$(SC000) \
+	$(ASM020) \
+	$(MZ80) \
+	$(M68705) \
+	$(GAMES) \
+	$(BGAMES) \
+	$(SYSDRV) \
+	$(VIDEO) \
+	$(SOUND) \
+	$(CORE) \
+	$(MAME) \
+	$(DEBUG) \
+	$(GUI) \
+	$(OBJDIR)/alleg/profile.o \
+	$(OBJDIR)/alleg/soundcfg.o \
+	$(M6502)
+
+endif
+
+ifdef SDL
+OBJS +=	$(OBJDIR)/sdl/blit.o \
+	$(OBJDIR)/sdl/display.o \
+	$(OBJDIR)/sdl/compat2.o
+else
+OBJS +=	$(OBJDIR)/alleg/blit.o \
+	$(OBJDIR)/alleg/display.o
+
+endif
+
+ifdef SEAL
+OBJS += $(OBJDIR)/seal/sasound.o
+else
+OBJS += $(OBJDIR)/alleg/sasound.o
+CFLAGS += -DALLEGRO_SOUND
+endif
+
+all:	message maketree $(RAINE_EXE)
+
+source/version.h: makefile
+# I have just removed the stuff about gcc --version.
+# Too much trouble with it. And I didn't know the __GNUC__ macros...
+ifeq ($(OSTYPE),dos)
+ifdef CROSSCOMPILE
+	@echo "#define VERSION \"$(VERSION)\"" > source/version.h
+#	@echo "#define GCC_VERSION \"`$(CC2) --version | grep '[0-9]\.[0-9]'`\"" >> source/version.h
+else
+# The dos seems too stupid to redirect stderr to a file (lame command.com).
+# Usually I use 4dos for that, but since most people don't I use redir here
+# which is in the standard djgpp install...
+# Even with bash installed it does not work (it calls the dos shell instead
+# of sh).
+	@djecho '#define VERSION $(VERSION)' > source/version.h
+#	@djecho '#define GCC_VERSION "' >> source\version.h
+#	@redir -oa source\version.h -eo $(CC2) --version | grep '[0-9]\.[0-9]'
+#	@djecho '"' >> source\version.h
+endif
+else
+# Carefull for the windows version you need sh.exe and echo.exe !
+	@echo "#define VERSION \"$(VERSION)\"" > source/version.h
+#	@echo "#define GCC_VERSION \"`$(CC2) --version | grep '[0-9]\.[0-9]'`\"" >> source/version.h
+endif
+
+ifdef RAINE32
+
+# Add a nice little icon...
+
+OBJS += $(OBJDIR)/raine.res
+
+$(OBJDIR)/raine.res:	source/raine.rc
+	windres -O coff -o $(OBJDIR)/raine.res -i source/raine.rc
+endif
+
+ifdef STATIC
+LIBS = $(LIBS_STATIC)
+CFLAGS += -DALLEGRO_STATICLINK
+endif
+
+message:
+ifdef RAINE_DEBUG
+	@echo -n Building Raine, debug version
+else
+	@echo -n Building Raine, Fully optimized version
+endif
+	@echo " with $(CC) for $(OSTYPE) CPU=$(CPU)"
+ifndef ASM_VIDEO_CORE
+	@echo "WARNING : move, newspr2, packed, and 32x32 sprites do not exist in the c"
+	@echo "          video core. Using the asm functions for these..."
+endif
+
+$(RAINE_EXE):	$(OBJS)
+	@echo Linking Raine...
+	$(CCV) $(LFLAGS) -o $(RAINE_EXE) $(OBJS) $(LIBS)
+
+ASM020: $(ASM020)
+
+VIDEO: $(VIDEO)
+
+grabber: raine.dat
+	   @echo Editing datafile...
+	   grabber raine.dat
+
+compress: $(RAINE_EXE)
+	   @strip $(RAINE_EXE)
+	   @echo Appending datafile...
+	   exedat -a -c $(RAINE_EXE) raine.dat
+	   upx -9 $(RAINE_EXE)
+
+# compile object from standard c
+
+$(OBJDIR)/%.o: source/%.c
+	@echo Compiling $<...
+	$(CCV) $(CFLAGS) -c $< -o $@
+
+# compile object from at&t asm
+
+$(OBJDIR)/%.o: source/%.s
+	@echo Assembling $<...
+	$(CCV) $(SFLAGS) -c $< -o $@
+
+# compile at&t asm from standard c
+
+$(OBJDIR)/%.s: source/%.c
+	@echo Compiling $<...
+	$(CCV) $(CFLAGS) -S -c $< -o $@
+
+# compile object from intel asm
+
+ifdef RAINE_LINUX
+   $(OBJDIR)/video/eagle.oa: source/video/eagle.asm
+	@echo Patching $<...
+	perl source/video/patch_eagle $< >$(OBJDIR)/video/eagle.asm
+	@echo Assembling $<...
+	$(ASM) -o $@ $(AFLAGS) $(OBJDIR)/video/eagle.asm
+endif
+
+$(OBJDIR)/%.oa: source/%.asm
+	@echo Assembling $<...
+	$(ASM) -o $@ $(AFLAGS) $<
+
+# generate s68000.asm
+
+$(OBJDIR)/68000/s68000.oa: $(OBJDIR)/68000/s68000.asm
+	@echo Assembling $<...
+	$(ASM) -o $@ $(AFLAGS) $<
+
+ifdef CROSSCOMPILE
+$(OBJDIR)/68000/s68000.asm: $(NATIVE)/object/68000/star.exe
+	cp -fv $(NATIVE)/object/68000/star.exe $(OBJDIR)/68000/
+else
+$(OBJDIR)/68000/s68000.asm: $(OBJDIR)/68000/star.o
+	$(CCV) $(LFLAGS) -s -o $(OBJDIR)/68000/star.exe $(OBJDIR)/68000/star.o
+endif
+	$(OBJDIR)/68000/star.exe -hog $@
+ifdef RAINE_LINUX
+	@echo Patching $@...
+	perl source/68000/patch_68000 $(OBJDIR)/68000/s68000.asm > $(OBJDIR)/s2.asm
+	mv -f $(OBJDIR)/s2.asm $(OBJDIR)/68000/s68000.asm
+endif
+
+# generate mz80.asm
+
+$(OBJDIR)/z80/mz80.oa: $(OBJDIR)/z80/mz80.asm
+	@echo Assembling $<...
+	$(ASM) -o $@ $(AFLAGS) $<
+
+ifdef CROSSCOMPILE
+$(OBJDIR)/z80/mz80.asm: $(NATIVE)/object/z80/makez80.exe
+	cp -fv $(NATIVE)/object/z80/makez80.exe $(OBJDIR)/z80/
+else
+$(OBJDIR)/z80/mz80.asm: $(OBJDIR)/z80/makez80.o
+	$(CCV) $(LFLAGS) -s -o $(OBJDIR)/z80/makez80.exe $<
+endif
+ifndef RAINE_LINUX
+	@$(OBJDIR)/z80/makez80.exe -s -cs -x86 $@
+else
+	$(OBJDIR)/z80/makez80.exe -l -s -cs -x86 $@
+	perl source/z80/patch_z80 $(OBJDIR)/z80/mz80.asm > $(OBJDIR)/z80.asm
+	mv -f $(OBJDIR)/z80.asm $(OBJDIR)/z80/mz80.asm
+endif
+
+# generate m6502.asm
+
+$(OBJDIR)/6502/m6502.oa: $(OBJDIR)/6502/m6502.asm
+	@echo Assembling $<...
+	$(ASM) -o $@ $(AFLAGS) $<
+
+$(OBJDIR)/6502/m6502.asm: $(OBJDIR)/6502/make6502.o
+	@echo Building M6502 $(OBJDIR)...
+ifdef CROSSCOMPILE
+	cp -fv $(NATIVE)/object/6502/make6502.exe $(OBJDIR)/6502/
+else
+	$(CCV) -s -o $(OBJDIR)/6502/make6502.exe $(OBJDIR)/6502/make6502.o
+endif
+ifdef RAINE_LINUX
+	$(OBJDIR)/6502/make6502.exe -l -s -6510 $@
+else
+	$(OBJDIR)/6502/make6502.exe -s -6510 $@
+endif
+
+# Notice : the following fix is specific to the frame pointer optimisation
+# of gcc 2.81 and higher (< 3.00)
+
+# kiki kai kai gcc bug
+
+$(OBJDIR)/games/kiki_mcu.o: source/games/kiki_mcu.c
+	@echo Compiling $<...
+	$(CCV) $(INCDIR) $(DEFINE) $(CFLAGS_MCU) -c $< -o $@
+
+# Same for kick and run...
+
+$(OBJDIR)/games/kick_mcu.o: source/games/kick_mcu.c
+	@echo Compiling $<...
+	$(CCV) $(INCDIR) $(DEFINE) $(CFLAGS_MCU) -c $< -o $@
+
+# This one happens for gcc < 3.2.1 (even 3.2.0)
+$(OBJDIR)/sound/ymf278b.o: source/sound/ymf278b.c
+	@echo Compiling WITH frame pointer $<...
+	$(CCV) $(INCDIR) $(DEFINE) $(CFLAGS_MCU) -c $< -o $@
+
+$(OBJDIR)/games/bubl_mcu.o: source/games/bubl_mcu.c
+	@echo "Compiling $< (gcc-3.3 bug work around)..."
+	$(CCV) $(INCDIR) $(DEFINE) $(_MARCH) -c $< -o $@
+
+# dependencies
+
+# does perl exist for djgpp ??!
+dep: make.dep
+make.dep:
+	./makedep $(OBJDIR) $(OBJS) > make.dep
+
+cpuinfo:
+	@sh ./detect-cpu
+
+include make.dep
+include cpuinfo
+
+# create directories
+
+dirs:
+	@echo make dirs is no longer necessary, just type make
+
+$(OBJDIRS):
+ifndef OSTYPE
+	@echo Your OSTYPE is not defined.
+	@echo "If you are in Unix/Linux, make sure you are using bash/sh."
+	@echo 'If this is the case, try to export OSTYPE : export OSTYPE=$OSTYPE'
+	@echo "If not, you can type (for dos/windows) :"
+	@echo "set OSTYPE=dos"
+	@echo "before make."
+	@exit 1
+else
+	$(MD) -p $@
+endif
+
+maketree: $(sort $(OBJDIRS))
+
+# remove all object files
+
+clean:
+	@echo Deleting object tree ...
+	$(RM) -r $(OBJDIR)
+	@echo Deleting $(RAINE_EXE)...
+	$(RM) $(RAINE_EXE) make.dep
+	$(RM) cpuinfo
+
+vclean:
+	@echo make vclean is no longer necessary, just type make clean
+
+# Installation part (Only for Unix)
+install: install_dirs $(RAINE_LNG)
+ifdef RAINE_LINUX
+
+	$(INSTALL_BIN) $(RAINE_EXE) $(bindir)
+	$(INSTALL_DATA) $(RAINE_DAT) $(rainedata)
+
+install_dirs:
+	$(MD) -pv $(bindir) $(rainedata) $(langdir) $(romdir)
+
+$(RAINE_LNG):
+	$(INSTALL_DATA) config/language/$@ $(langdir)
+
+else
+	@echo There is no needs to install for a win32/dos system
+endif
+
+
+uninstall:
+ifdef RAINE_LINUX
+	$(RM) $(bindir)/$(RAINE_EXE)
+	$(RM) $(rainedata)/$(RAINE_DAT)
+	$(CD) $(langdir); rm -f $(RAINE_LNG)
+	$(RD) $(langdir) $(romdir) $(rainedata)
+
+else
+	@echo There is no needs to uninstall for a win32/dos system
+endif

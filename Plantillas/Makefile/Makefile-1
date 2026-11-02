@@ -1,0 +1,25 @@
+
+OBJS = Objs
+
+export GURULIBRERIAS = ../../Librerias
+
+export OBJ_GURULIB := 	GuruLista.o GuruLog.o GuruError.o GuruInterCom.o \
+						GuruAsyncSocket.o GuruRegistry.o GuruSocket.o \
+                        GuruSocketProtocolo.o GuruSvc.o Log.o GuruInterComSocket.o
+
+# me mapea al objeto real ... -> ../../Librerias/Obj/GuruLista.o
+include ${GURULIBRERIAS}/GuruLibs.mak
+
+PROG = ${OBJS}/Catapulta.o ${OBJS}/CatapultaProt.o \
+       ${OBJS}/CatapultaSocket.o ${OBJS}/CatapultaSvc.o
+
+Catapulta.exe: ${PROG} ${OBJ_GURULIB} Makefile
+	@$(CXX) -s $(LDFLAGS) -o $@ $(PROG) $(OBJ_GURULIB) -lWs2_32 -lAdvapi32
+	@echo $@ a sido creado ....
+
+${OBJ_GURULIB}:
+	$(MAKE) -C ${GURULIBRERIAS} -f GuruLibs.mak
+
+${OBJS}/%.o: ./%.cpp
+	@echo Compilando $< - $@
+	@${CXX} -I${GURULIBRERIAS} -c $< -o $@

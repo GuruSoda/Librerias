@@ -1,0 +1,21 @@
+# nada
+
+DESTINO=./Debug
+
+LIBRERIAS=GuruBuffer.o GuruSocket.o GuruAsyncSocket.o GuruError.o
+OBJ=main.o Guruhttp.o GuruhttpExcepcion.o 
+
+INCLUDE=../../Librerias
+
+GuruServidorWeb: ${LIBRERIAS} ${OBJ} Makefile
+	@$(CXX) -s $(LDFLAGS) -o $@ $(OBJ) ${LIBRERIAS} -lWs2_32 -lAdvapi32
+	@echo $@ a sido creado ....
+
+${OBJ}: %.o: ./%.cpp
+	@echo Compilando $?
+	@${CXX} -I${INCLUDE} -c $? -o $@
+
+${LIBRERIAS}: %.o: ${INCLUDE}/%.cpp 
+	@echo Compilando $?
+	@${CXX} -I${INCLUDE} -c $? -o $@
+

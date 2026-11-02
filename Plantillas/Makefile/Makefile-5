@@ -1,0 +1,43 @@
+LIBRERIAS=GuruBuffer.o GuruSocket.o GuruAsyncSocket.o GuruLista.o GuruError.o GuruConfig.o GuruSvc.o GuruDirectorio.o \
+GuruCompat/splitpath.o GuruCompat/xtoa.o GuruHttp/Guruhttp.o GuruHttp/GuruhttpExcepcion.o GuruHttp/GuruhttpServidor.o \
+GuruHttp/GuruhttpConfig.o GuruHttp/GuruhttpInterface.o
+
+OBJ=main.o SvcGuruWeb.o httptest.o
+
+CXX = g++
+
+INCLUDE=../../Librerias
+
+ifeq ($(OSTYPE),linux-gnu)
+	SHELL = bash
+endif
+
+# ifeq ($(findstring linux, $(OSTYPE)), )
+ifndef MINGW
+DLL=-lpthread
+DESTINO=./
+RM=rm
+EJECUTABLE=GuruServidorWeb
+else
+DLL=-lWs2_32 -ladvapi32
+DESTINO=.
+RM=rm.exe
+EJECUTABLE=GuruServidorWeb.exe
+endif
+
+inicio: ${EJECUTABLE}
+
+${EJECUTABLE}: ${LIBRERIAS} ${OBJ} Makefile
+	@$(CXX) -s $(LDFLAGS) -o ${DESTINO}/$@ $(OBJ) ${LIBRERIAS} ${DLL}
+	@echo $@ a sido creado ....
+
+${OBJ}: %.o: ./%.cpp
+	@echo Compilando $?
+	@${CXX} -I${INCLUDE} -c $? -o $@
+
+${LIBRERIAS}: %.o: ${INCLUDE}/%.cpp 
+	@echo Compilando $?
+	@${CXX} -I${INCLUDE} -c $? -o $@
+
+clean:
+	@${RM} -f ${OBJ} ${LIBRERIAS}

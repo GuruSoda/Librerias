@@ -1,0 +1,37 @@
+
+.SUFFIXES = .c .cpp
+
+DIR_LIBRERIAS:=../../Librerias/
+
+
+DIR_OBJETOS = Objs/
+
+LIBRERIAS := GuruLista.o GuruBuffer.o GuruError.o GuruInterCom.o \
+			GuruSocket.o GuruSocketProtocolo.o GuruInterComConsola.o \
+			GuruProtocoloCliente.o GuruInterComSocket.o
+
+OBJETOS := $(addprefix ${DIR_OBJETOS}, ${LIBRERIAS})
+
+PROPIOS := ParserCmd.o CcgMacro.o
+OBJETOS += $(addprefix ${DIR_OBJETOS}, ${PROPIOS})
+
+macro: ${OBJETOS}
+	@$(CXX) -s $(LDFLAGS) -o /tmp/$@ $(OBJETOS)
+	@echo "Todo terminado????"
+#	@echo "Ejecutando ...."
+#	@/tmp/$@
+
+${DIR_OBJETOS}%.o:./%.cpp
+	@echo "Compilando C++ $? -> $@"
+	@${CXX} -O2 -s -x c++ -pipe ${CFLAGS} -c $? -o $@
+
+${DIR_OBJETOS}%.o:${DIR_LIBRERIAS}%.cpp
+	@echo "Compilando C++ $? -> $@"
+	@${CXX} -O2 -s -x c++ -pipe ${CFLAGS} -c $? -o $@
+
+${DIR_OBJETOS}%.o:./%.c
+	@echo "Compilando C $? -> $@"
+	@${CXX} -c $? -o $@
+
+clean:
+	@rm ${OBJETOS}
