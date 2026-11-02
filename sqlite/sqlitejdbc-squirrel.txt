@@ -1,0 +1,12 @@
+Accessing SQLites database using SQuirrel SQL Client
+
+Download and install SQuirrel SQL Client 
+Download SQLiteJDBC (tested v054 for SQLite 3.6.3) and copy the JAR in the lib directory of SQuirrel
+Start SQuirrel and create a new driver with the following settings:
+Name: SQLite
+Example URL: jdbc:sqlite://DRIVE:/dirA/dirB/db.sqlite
+Website URL: http://www.zentus.com/sqlitejdbc/
+Class Name: org.sqlite.JDBC
+Create an Alias using the SQLite driver created in the previous step.
+
+ftp://priede.bf.lu.lv/pub/DatuBazes/-DBVS/SQirreL/apraksti/SQLite.html
